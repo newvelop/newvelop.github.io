@@ -31,6 +31,7 @@ github_username:  jekyll
 
 # Build settings
 theme: jekflix
+remote_theme : thiagorossener/jekflix-template
 plugins:
   - jekyll-feed
 
