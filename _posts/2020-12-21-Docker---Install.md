@@ -32,4 +32,7 @@ dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /nores
 WSL 설치하기에 앞서 설치를 할 수 있게 위와 같은 명령어로 활성화를 해준다.
 
 #### WSL용 리눅스 설치
-활성화한 후에 
+활성화한 후에 윈도우 키를 누르고 검색으로 Microsoft store를 입력하여 스토어 창을 켠다. 그리고 linux를 검색하면 설치할 수 있는 리눅스들이 나오는데 이중에서 본인은 ubuntu를 선택하여 진행한다.
+![screensh](../assets/img/2012-12-21-docker---install/Microsoft-Store.png)
+
+어느 정도 시간이 흐른 후, 커맨드 창에 사용자 이름과 패스워드를 입력하라고 하는 입력하면 우분투가 설치 완료가 된다.
