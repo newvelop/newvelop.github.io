@@ -42,15 +42,41 @@ Core Container는 Core, Beans, Context, Expression Language 모듈들로 이루�
 
 Core와 Beans는 IoC와 DI 등 프레임워크의 핵심 기능을 제공해주는 모듈들로, 팩토리 패턴으로 구현된 BeanFactory 클래스가 싱글톤 패턴의 필요성을 없애주며 프로그램 로직을 구현할 수 있게 해준다.
 
-Context 모듈은 
+Context 모듈은 resource bundle을 지원하여 다국어 기능을 지원하고, 이벤트 전파, 리소스 로딩 등을 지원한다. AppplicationContext 인터페이스는 Context 모듈의 중점이다.
 
-Expression Language 모듈은 
+Expression Language 모듈은 JSP에서 EL을 사용할 수 있게하는 기능 등을 제공한다.
 
 #### Data Access/Integration
+Data Access/Integration 레이어는 JDBC, ORM, OXM, JMS, Transaction 모듈들로 이루어져있다.
 
+JDBC 모듈은 JDBC 관련 코딩을 해야하는 필요성을 제거해주는 JDBC 추상화 계층을 제공한다.
 
-### 결론
-이렇듯 웹 어플리케이션을 구축하는데 있어서 프레임워크는 매우 유용한 장점들을 제공하지만, 약간의 단점을 안고 있기 때문에 사용할 땐 이러한 점들을 고려해야한다.
+ORM 모듈은 JPA, JDO, Hibernate 등 Object-relational 매핑 API를 제공한다.
+
+OXM 모듈은 Object/XML 매핑의 추상화를 제공한다.
+
+JMS(Java Messaging Service) 모듈은 메시지를 생성 및 소비하는 기능을 제공한다.
+
+Transaction 모듈은 POJO를 이용하여 트랜잭션을 관리할 수 있는 인터페이스들을 직접 구현한 클래스들을 제공한다.
+
+#### Web
+Web 레이어는 Web, Web-Servlet, Web-Struts, Web-Portlet 모듈들로 구성되어있다.
+
+Web 모듈은 multipart 지원 및 IoC 컨테이너, application context를 초기화하는 기능을 제공한다.
+
+Web-Sevlet 모듈은 MVC 패턴을 구현하는 구현체를 포함하고있다.
+
+Web-Struts 모듈은 Struts클래스들을 지원하는 기능을 제공한다.
+
+Web-Portlet 모듈은 포틀릿 환경을 지원하고 Web-Servlet 모듈의 기능을 mirror(복제?)한다. Portlet이 무엇인지 차후 알아보도록한다. 
+
+#### AOP와 Instrumentation
+AOP 계층은 AOP 프로그래밍을 할 수 있도록 기능을 지원한다.
+
+Instrumentation 계층은 어플리케이션 서버에 사용되는 클래스로더 구현체와 클래스 instrumentation 등을 제공한다. 
+
+#### Test
+Test 모듈은 JUnit과 TestNG의 테스팅 컴포넌트들을 지원한다.
 
 참고
 - https://docs.spring.io/spring-framework/docs/3.0.x/spring-framework-reference/html/overview.html
