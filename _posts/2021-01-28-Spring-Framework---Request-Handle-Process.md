@@ -41,7 +41,19 @@ Mapping을 하기 전에, Interceptor가 Request를 읽는다.
 
 즉 정리를 하자면 웹서버단의 Filter에서 출발해서 Interceptor -> AOP -> Controller 순으로 요청이 전달되면서 처리된다.
 
+### Dispatcher Servlet 동작 과정
+Dispatcher Servlet이 내부에서 동작하는 과정을 살짝 추가해본다.
+![screensh](../assets/img/2021-01-28-Spring-Framework---Request-Handle-Process/DispatcherServlet.jpg)
+위와 같이 처리과정이 있는데, 일단 Request가 들어오게되면 맞는 컨트롤러를 찾기위해 Handler Mapping을 한다. 이 사이에 Interceptor가 동작한다고
+생각하면 된다. 그리고 매핑이 끝나 맞는 컨트롤러를 찾게되면 컨트롤러에 Request를 전달한다. 이 사이에 AOP가 있다고 보면된다.
+Request를 전달해서 컨트롤러가 처리를 하면 해당하는 ModelAndView를 반환한다. Dispatcher Servlet은 전달받은 내용을 View Resolver에 다시 전달하여 
+Request에 반환할 화면을 찾는다. 만약 @RestController라면 이작업을 생략하고 JSON 데이터를 반환한다.
+결과적으로 Request에 맞는 화면을 Response로 반환을 하게 된다.
+
+이와 같이 웹서버에서 웹 애플리케이션으로 Request가 넘어오는 과정과, Spring 내부에서 Request를 처리하는 과정을 간략히 살펴봤다.
+
 
 참고
 - https://mossgreen.github.io/Servlet-Containers-and-Spring-Framework/
 - https://sallykim5087.tistory.com/158
+- https://www.stechstar.com/user/zbxe/JSPWebProg/53384
