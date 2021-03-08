@@ -64,60 +64,117 @@ modelMapper보다 좀 더 사용하기 좋다고 판단한 Mapstruct의 사용�
 ### 일반적인 코드
 ModelMapper와 마찬가지로 자바에서 객체 간 매핑에 대한 코드를 자동으로 생성해주는 매핑 라이브러리이다. 다른 점이라면, Annotation Processor를 사용하여 런타임이 아니라 컴파일 시, 매핑코드를 생성해준다.
 
+일반적인 Dto와 Entity를 예시로 삼아서 매핑하는 방법을 소개한다.
 
-### 구조
-![screensh](../assets/img/2021-02-04-Spring---Security/spring-security-architecture.PNG)
-
-spring security의 동작 구조는 상단과 같다.
-1. 클라이언트에서 어플리케이션으로 request가 오게 되면 Authentication Filter가 이 request를 가로챈다.
-2. 가로챈 request를 사용자 관련한 인증 정보 객체로 변환을 한다(ex) 사용자 + 비밀번호).
-3. 변환된 인증 정보 객체를 Authentication Manager에게 전달한다. Authentication Manager는 적절한 Provider를 선택해서 인증하는 관리자이다.
-4. Authentication Manager가 적절한 Authentication Provider를 선택해서 인증을 수행하게 한다.
-5. User Details란 사용자 정보가 어떻게 담겨있는지를 나타내는 인터페이스이다.
-6. 패스워드 인코딩을 하는 객체이다.
-7. 인증 정보를 다시 역전파한다.
-8. 인증 정보를 다시 역전파한다.
-9. 인증 정보를 security context로 넘긴다. (Spring container에 올라가있는 Security context). Security Context는 인증된/인증되지 않은 사용자 정보를 저장한다.
-
-### 동작 구현
-Spring boot에서 Spring security를 적용할 경우, 일반적으로 Spring-boot-starter-security 같은 디펜던시를 pom.xml에 추가하여 의존성관리를 간편하게
-하는 측면이 있다. 이 의존성을 임포트할 경우, 아무런 옵션을 주지 않아도 security가 활성화 되어 모든 api에 인증 헤더를 넣지 않을 경우 401 status code를
-return하게 된다. 하지만 모든 api에 security를 적용하지 않고 인증하지 않은 사용자도 사용 가능하게 할 수 있기 때문에 커스텀 동작을 할 수 있게 구현을 하고자 한다.
-
-#### 설정 작성
-1. 어노테이션 부여 : 새로운 클래스를 작성한 후, @Configuration을 붙여서 설정파일이란 것을 명시한다.
-2. 상속 : WebSecurityConfigurerAdapter 클래스를 상속하여 Security 관련 설정을 할 수 있게 한다.
-   * WebSecurityConfigureAdapter클래스를 파고 들어보면, configure라는 메소드가 있고 코드를 보면 모든 request에 대해서 검증을 해야되는것이 기본 옵션임을 확인할 수 있다.
-  ```
-    protected void configure(HttpSecurity http) throws Exception {
-        this.logger.debug("Using default configure(HttpSecurity). If subclassed this will potentially override subclass configure(HttpSecurity).");
-        http.authorizeRequests((requests) -> {
-            ((AuthorizedUrl)requests.anyRequest()).authenticated();
-        });
-        http.formLogin();
-        http.httpBasic();
-    }
-  ```
-3. url 별 권한 설정 : WebSecurityConfigurerAdapter에서 configure를 통해 http 모든 요청에 대해서 인증을 해야지만 사용할 수 있게 했다. 이 메소드를 오버라이딩하여 url별 접근 권한을 설정한다.
+User.java
 ```
-@Override
-    protected void configure(HttpSecurity http) throws Exception{
-        http
-                .authorizeRequests()
-                    .antMatchers(HttpMethod.POST, "/test1").authenticated()
-                    .antMatchers(HttpMethod.POST, "/test2").permitAll()
-                    .anyRequest().denyAll()
-                .and().formLogin()
-                .and().httpBasic()
-                .and().csrf().disable();
-    }
+@Data
+@Entity(name =  "I_USER")
+@EntityListeners(RefreshHelper.class)
+@Accessors(chain = true)
+public class User {
+    @Id
+    @GeneratedValue(strategy= GenerationType.IDENTITY)
+    private Long userUid;
+
+    @Column(unique = true, length = 16, updatable = false, nullable = false)
+    private String userId;
+
+    @Column(length = 16, nullable = false)
+    private String userName;
+
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    @Column(nullable = false, length = 256)
+    private String password;
+
+    @ManyToMany(fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.MERGE })
+    @JoinTable(name = "user_user_group", joinColumns = @JoinColumn(name="user_uid"), inverseJoinColumns = @JoinColumn(name="user_group_id"))
+    @JsonIgnoreProperties({"users"})
+    private Set<UserGroup> userGroups;
+}
 ```
-위의 코드에서 .authorizeRequests()는 request에 대한 검증을 한다는것이고 .antMatchers는 url의 정규표현식 매칭을 통해, 파라미터에 해당하는 url을 찾아내는 것이고 뒤에 authenticated가 붙으면 인증을 해야지 해당 url을 사용 가능, .permitAll일 경우 모든 사용자 허용을 의미한다. .denyAll 부분은 위의 request를 제외한 모든 request를 인증여부와 관계없이 거부 하겠다는 의미이다. formLogin은 폼으로 로그인 하는 화면 관련 설정이고, httpBasic은 basicAuth를 사용할 수 있게하는 메소드이다.
-csrf disable한 이유는 postman을 통해 테스트를 할 시, POST 메소드가 동작하지 않아 설정했다.
 
-* 유의사항 : 만약 같은 강좌를 듣고 있는 사람이 있다면, ComponentScan에 해당 설정클래스의 패키지를 등록하지 않으면 @Configuration 어노테이션을 등록해도 설정 파일이 동작하지 않는다. 왜냐하면 Main 클래스의 패키지의 레벨이 다른 패키지들과 동일하여 등록하지 않을 경우 스캔하지 않기때문이다. 본인의 경우는 그냥 Main클래스를 위의 패키지로 이동해서 따로 스캔하라고 등록하지 않아도 알아서 스캔하게 설정을 했다.
+UserDto.java
+```
+@Data
+@JsonInclude(JsonInclude.Include.NON_NULL)
+@Accessors(chain = true)
+public class UserDto extends FailMessageDto{
+    private Long userUid;
+    private String userId;
+    private String userName;
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private String password;
 
-금일의 포스팅은 여기까지
+    private Set<Long> userGroupIds;
+}
+```
 
-참고
-- spring-security-zero-to-master
+위와 같은 예시코드가 있으며 UserGroup이란 클래스와 다대다 관계를 형성하고 있다고 해보자.
+이를 서로 매핑하려면 메소드를 하나 만들어주고, 속성별로 복사하는 코드를 작성해야한다.
+Mapstruct를 사용할 경우, Mapper 인터페이스를 생성하고, 객체 매핑하는 규칙을 작성하면 이에 걸맞는 매핑 코드를 자동으로 생성해준다.
+
+UserMapper.java 선언부
+```
+@Mapper(imports = {//여기서 사용할 클래스들을 작성}, nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE  //null 무시할 정책 사용할 경우)
+public interface UserMapper {
+}
+```
+
+#### 생성
+UserDto을 기반으로 User 엔티티를 생성하고, 이를 DB에 저장하고 싶을 경우 작성하는 코드이다.
+```
+@Mappings({
+            @Mapping(target = "userGroups", expression = "java(userDto.getUserGroupIds() == null ? null : userDto.getUserGroupIds().stream().map(v -> new UserGroup(v)).collect(Collectors.toSet()))")
+    })
+    User userDtoToUser(UserDto userDto, @Context CycleAvoidingMappingContext context);
+```
+context는 차후 설명하도록 하고, mapping rule을 좀 살펴보면 dto와 entity간의 필드명이 같고 타입 또한 같을 경우 알아서 복사를 해주기 때문에 Mapping 규칙을 따로 지정해주지 않는다. 다만 UserGroupIds 속성과 UserGroups를 살펴보면 Class의 Set과 int의 Set으로 다르다. 이럴 경우 본인은 expression을 사용하여 Java 코드로 매핑을 해결하였다.
+
+User에서 UserDto를 만드는 방법은 위의 코드를 반대로 작성하면 된다.
+
+#### 수정
+JPA를 이용하여 수정을 해야되는 경우, 있는지 조회를 하고 값을 수정해서 SAVE 하는 로직을 수행한다.
+따라서 조회를 하면 User 엔티티가 생성되는데 이때 User 엔티티의 id값은 복사할 필요가 없고 나머지 값들만 복사하면 된다. 이에 대한 규칙을 작성해보면 
+```
+@Mappings({
+            @Mapping(target = "userId", ignore = true)
+    })
+    void updateUserFromUserDto(UserDto userDto, @MappingTarget User user, @Context CycleAvoidingMappingContext context);
+```
+위와 같이 코드를 작성할 수 있게된다. 물론 Null 값이 dto에 있을 경우 null 값이 db에 작성되지 않느냐고 할 수 있는데 이미 UserMapper 선언부에 NULL IGNORE 정책을 사용한다고 명시를 해놨기 때문에 문제가 없다.
+
+### Cycle 해결
+JPA 엔티티를 DTO로 변경할 때 유의점은 N:1 혹은 N:M 관계를 지니고 있으며 이 관계가 양방향 참조일 경우이다. User로 예시를 들면 User의 UserGroups 필드가 있는데 이 UserGroups의 멤버를 하나씩 살펴보면 UserGroup 객체이며, 이 관계는 본인이 양방향으로 설정해놨기 때문에 Users 필드가 안에 존재한다. 따라서 서로 상호 참조하는 Cycle이 발생하게 되는데, Entity를 DTO로 바꿀시 상호 참조하는 코드를 작성하게 되어 결국 stackOverflow 에러가 발생하게 된다.
+
+이를 해결하는 해결법으로는 하위 필드를 ignore하는 방법이 첫째로 존재한다. 하지만 이 방법 말고 다른 방법을 찾아본 결과 IdentityHashMap을 사용하여 source를 map으로 작성하고 이를 mapping에 사용하면 cycle이 발생하지 않는다고 한다.
+
+상세한 이유는 차후 살펴보며 기술하겠다.
+
+단순히 해결법만 찾아보면
+
+```
+/**
+ * A type to be used as {@link Context} parameter to track cycles in graphs.
+ * <p>
+ * Depending on the actual use case, the two methods below could also be changed to only accept certain argument types,
+ * e.g. base classes of graph nodes, avoiding the need to capture any other objects that wouldn't necessarily result in
+ * cycles.
+ *
+ * @author Andreas Gudian
+ */
+public class CycleAvoidingMappingContext {
+    private Map<Object, Object> knownInstances = new IdentityHashMap<Object, Object>();
+
+    @BeforeMapping
+    public <T> T getMappedInstance(Object source, @TargetType Class<T> targetType) {
+        return (T) knownInstances.get( source );
+    }
+
+    @BeforeMapping
+    public void storeMappedInstance(Object source, @MappingTarget Object target) {
+        knownInstances.put( source, target );
+    }
+}
+```
+위의 코드를 기반으로 context 클래스를 생성한후, Mapper에 @context 인자로 넘겨주면 cycle이 해결이 된다.
