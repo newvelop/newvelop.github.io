@@ -110,6 +110,15 @@ public class UserDto extends FailMessageDto{
 }
 ```
 
+FailMessageDto.java
+```
+@Data
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class FailMessageDto {
+    protected String message;
+}
+```
+
 위와 같은 예시코드가 있으며 UserGroup이란 클래스와 다대다 관계를 형성하고 있다고 해보자.
 이를 서로 매핑하려면 메소드를 하나 만들어주고, 속성별로 복사하는 코드를 작성해야한다.
 Mapstruct를 사용할 경우, Mapper 인터페이스를 생성하고, 객체 매핑하는 규칙을 작성하면 이에 걸맞는 매핑 코드를 자동으로 생성해준다.
