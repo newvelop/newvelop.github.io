@@ -34,9 +34,14 @@ Docker라는 단어에 대해서 여러번 들어봤지만 다시 한 번 이것
   ![screensh](../assets/img/2021-03-28-Docker---Concept/Docker-volume.png)
 
 #### Docker VS VM
+Docker와 VM의 차이점에 대해서 살펴보면 VM같은 경우는 본인 컴퓨터의 OS위에서 Hypervisor를 이용해 가상화한 OS를 위에 올리고, 이 OS위에 다시 어플리케이션을 올리는 개념이다. 즉 OS 위에 OS가 올라가서 Overhead가 꽤 크다. 반면에 Docker의 경우 OS위에 Docker Engine이 올라가고, 이 위에 어플리케이션이 묶인 컨테이너들이 올라가는 구조적 차이가 있다. 즉 OS위에 OS가 올라가는지 안올라가는지의 차이가 있다
 
+![screensh](../assets/img/2021-03-28-Docker---Concept/docker_vs_vm.jpg)
 
 #### 동작 원리
+![screensh](../assets/img/2021-03-28-Docker---Concept/Docker-architecture.png)
+
+해당 동작 원리는 Docker관련 유튜브 영상을 보고 요약한 부분이다. 구조는 상단의 그림과 같다. 먼저 Docker 엔진을 통해서 컨테이너들이 관리가 되는데, Docker 엔진은 클라이언트와 서버가 있으며, 이들이 각각 REST API를 통해 통신을 한다. 엔진의 클라이언트는 사용자의 command를 체크해서 커맨드 기반으로 REST API를 서버에 호출한다. 서버는 해당 REST API를 읽어서 요청에 맞는 컨테이너/이미지 관리를 한다.
 
 #### Layer
 
@@ -47,3 +52,5 @@ Docker라는 단어에 대해서 여러번 들어봤지만 다시 한 번 이것
 - https://medium.com/extales/%EB%A6%AC%EB%88%85%EC%8A%A4-%EC%BB%A8%ED%85%8C%EC%9D%B4%EB%84%88-linux-containers-lxc-%EC%97%90-%EB%8C%80%ED%95%B4%EC%84%9C-%EC%95%8C%EC%95%84%EB%B3%B4%EC%9E%90-132dde6331f8
 - https://laptrinhx.com/docker-vs-lxc-lxd-what-s-the-best-for-your-website-3453457212/
 - https://archives.flockport.com/lxc-vs-docker/
+- https://chacha95.github.io/2020-08-08-Docker_Kubernetes1/
+- https://youtu.be/rOTqprHv1YE
