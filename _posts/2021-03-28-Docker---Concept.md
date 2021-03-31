@@ -32,19 +32,13 @@ Docker라는 단어에 대해서 여러번 들어봤지만 다시 한 번 이것
   리눅스의 컨테이너는 독자적인 시스템 환경이라고 언급했듯이, 해당 컨테이너의 프로세스에서 사용하는 데이터들은 전부 해당 컨테이너에 저장이 된다. 반면에 Docker의 데이터는 컨테이너에 저장되지 않는다. 데이터를 어떻게 유지하냐 라고 하면 Docker의 Volume 개념이 있어서 Volume을 컨테이너에 바인드시켜서 데이터를 사용한다.
 
   ![screensh](../assets/img/2021-03-28-Docker---Concept/Docker-volume.png)
-   
-2. d
-
-3. 
-
 
 #### Docker VS VM
 
 
+#### 동작 원리
 
-![screensh](../assets/img/2020-12-21-docker---install/Microsoft-Store.png)
-
-어느 정도 시간이 흐른 후, 커맨드 창에 사용자 이름과 패스워드를 입력하라고 하는 입력하면 우분투가 설치 완료가 된다.
+#### Layer
 
 
 참고
