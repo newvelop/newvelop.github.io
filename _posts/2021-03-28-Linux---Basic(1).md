@@ -1,7 +1,7 @@
 ---
 date: 2021-03-29 02:29:39
 layout: post
-title: "Linux-Basic"
+title: "Linux-Basic(1)"
 subtitle:
 description:
 image:
