@@ -13,169 +13,169 @@ tags:
 author: newvelop
 paginate: false
 ---
-Webflux에서 사용하는 Project Reactor에서, Flux를 기반으로 에러 핸들링, 백 프레셔 등등에 대해 알아본다
+Webflux에서 Rest API를 구현하는 방법을 알아본다.
 
-### 에러 핸들링
-데이터 스트림을 다루다 보면 중간에 에러가 발생할 수 있다. 이와 관련하여 몇가지 처리방법을 알아본다.
-
-#### onErrorResume
-에러가 발생할 경우, 에러를 처리한 이후에 다시 이어갈 flux를 반환하여 스트림을 이어가는 메소드이다.
+### @RestController를 이용하여 만들기
+일반적으로 Spring boot에서 컨트롤러를 만드는 @RestController 어노테이션을 사용하여 non blocking api를 만들어본다.
 
 ```
-Flux<String> stringFlux = Flux.just("A", "B", "C")
-    .concatWith(Flux.error(new RuntimeException("exception")))
-    .concatWith(Flux.just("D"))
-    .onErrorResume((e) -> {
-        System.out.println("exception is " + e);
-        return Flux.just("default", "default1");
-    });
+@GetMapping("/flux")
+public Flux<Integer> getFlux() {
+    return Flux.just(1,2,3,4)
+            .log();
+}
 ```
-
-위와 같이 코드를 작성했을 경우, exception이 ABC 처리 이후에 발생을 하는데 exception이 onErrorResume에서 잡혀서, 에러 관련 출력을 한후 다시 새로운 flux를 반환하여 스트림을 이어가 결국에 5개의 데이터를 반환하게 된다.
-
-#### onErrorReturn
-에러가 발생되었을 경우 값 반환하고 스트림 끝내는 처리방법이다.
+위와 같이 flux를 이용하여 반환하는 get방식의 메소드를 구현할 경우, 1,2,3,4를 브라우저에서 올바르게 반환한다. 하지만 아래와 같이
 
 ```
-Flux<String> stringFlux = Flux.just("A", "B", "C")
-    .concatWith(Flux.error(new RuntimeException("exception")))
-    .concatWith(Flux.just("D"))
-    .onErrorReturn("test");
+@GetMapping("/flux/delay")
+public Flux<Integer> getDelayFlux() {
+    return Flux.just(1,2,3,4)
+            .delayElements(Duration.ofSeconds(1))
+            .log();
+}
 ```
-ABC를 반환하다 에러가 발생했을 경우, test를 반환하고 스트림이 종료된다.
+delay를 줄 경우, 브라우저에선 비동기로 실행되는 것이 아니라 동기로 실행되어 모든 요소들을 받을 때까지 기다렸다가 렌더링을 하기 때문에 4초 흐른 뒤, 1,2,3,4를 반환한다.
 
-#### onErrorMap
-에러가 발생했을 경우, 이를 새로운 예외로 매핑해서 처리하는 기법이다.
-```
-Flux<String> stringFlux = Flux.just("A", "B", "C")
-    .concatWith(Flux.error(new RuntimeException("exception")))
-    .concatWith(Flux.just("D"))
-    .onErrorMap((e) -> new CustomException(e));
-```
-
-해당 방법은 어플리케이션에서 비즈니스 예외 처리를 정의해놨을 경우, 매핑해서 사용하면 될 것이다.
-
-#### retry
-에러가 발생했을 경우, 스트림을 지정된 횟수만큼 시도하는 방법이다
+이를 요소 하나씩 받을때 마다 렌더링을 하고자 할 경우
 
 ```
- Flux<String> stringFlux = Flux.just("A", "B", "C")
-    .concatWith(Flux.error(new RuntimeException("exception")))
-    .concatWith(Flux.just("D"))
-    .retry(2);
+@GetMapping(value = "/flux/stream", produces = MediaType.APPLICATION_STREAM_JSON_VALUE)
+public Flux<Long> getFluxStream() {
+    return Flux.interval(Duration.ofSeconds(1))
+            .log();
+}
 ```
-이렇게 처리할 경우, 결국에 ABC를 기존 말고 두번 더 시도해서 총 9개의 문자열이 출력된다.
+이런 식으로 MediaType을 stream 타입으로 부여하여 반환하면, 브라우저에선 스트림으로 인식하여 값이 들어올때마다 표시한다.
 
-#### retryBackoff
-에러가 발생했을 경우, 지정된 횟수만큼 시도를 하는 것인데, 시도하는 텀을 두고 수행하는 방법이다. 
-
-```
-Flux<String> stringFlux = Flux.just("A", "B", "C")
-    .concatWith(Flux.error(new RuntimeException("exception")))
-    .concatWith(Flux.just("D"))
-    .onErrorMap((e) -> new CustomException(e))
-    .retryBackoff(2, Duration.ofSeconds(2));
-```
-
-에러가 발생했을 경우, 바로 처리가 안되는 경우가 많기 때문에 텀을 두고 처리하면 좋을 것 같다.
-
-### 시간을 이용한 생성 및 지연 방법
-데이터를 무제한으로 넣어서 flux를 생성하는 방법이 있다.
+### @RestController 테스트
+@RestController를 이용하여 구현한 클래스를 테스트하는 법을 설면한다
 
 ```
-Flux<Long> infiniteFlux = Flux.interval(Duration.ofMillis(200))
-    .log();
+@RunWith(SpringRunner.class)
+@WebFluxTest
+public class FluxAndMonoControllerTest {
+}
 ```
-이렇게 생성을 할 경우, 0.2초 간격으로 0부터 1씩 증가하는 데이터를 꾸준히 생성한다. 이때 주의할 점이 테스트를 할때,
-
-```
-infiniteFlux
-    .subscribe((element) -> System.out.println("value is : " + element));
-```
-이렇게 처리할 경우 값이 출력이 안되는데 이는 비동기/논블로킹 방식이기 때문에, 호출했던 스레드가 먼저 subscribe 시켜놓고 종료되어버려서 데이터 스트림이 생성되고 반환되는 것을 확인할 수 없다.
+Junit 4를 사용할 경우, 위와 같이 @RunWith 어노테이션과 @WebFluxTest 어노테이션을 사용하여 클래스를 작성한다.
 
 ```
-Thread.sleep(3000);
-```
-위와 같이 스레드를 대기시켜 살려놓는 방법으로 테스트를 해볼 수 있다.
+    @Autowired
+    WebTestClient webTestClient;
 
-뿐만 아니라, 지정된 개수만큼 값을 생성할 수 있는데, 이는 take() 함수를 flux에서 호출해주고 인자로 원하는 개수를 넘겨주면 된다.
+    @Test
+    public void flux_approach1() {
+        Flux<Integer> integerFlux = webTestClient.get().uri("/flux")
+                .accept(MediaType.APPLICATION_JSON_UTF8)
+                .exchange()
+                .expectStatus().isOk()
+                .returnResult(Integer.class)
+                .getResponseBody();
 
-### 백프레셔
-백프레셔라 함은 publisher가 subscriber에게 데이터 반환하는 수를 제한하는 것을 의미한다.
-
-![screensh](../assets/img/2021-04-01-Spring---Webflux(3)/nobackpressure.PNG)
-
-일반적으로 백프레셔를 설정하지 않으면, 위와 같이 모든 데이터를 차례로 반환한다.
-
-![screensh](../assets/img/2021-04-01-Spring---Webflux(3)/backpressure.PNG)
-
-백프레셔를 설정해서 반환하는 개수를 지정하여 그 개수씩 반환을 받을 수 있다.
-
-```
-Flux<Integer> finiteFlux = Flux.range(1, 10)
-        .log();
-
-finiteFlux.subscribe((element) -> System.out.println("element is " + element)
-        , (e) -> System.err.println("exception is : " + e)
-        , () -> System.out.println("done")
-        , (subscription -> subscription.request(2)));
-```
-첫 번째 방법으로는 subscription에 직접 request 개수를 지정하는 방법이 있고, 두 번째로는
-
-```
-Flux<Integer> finiteFlux = Flux.range(1, 10)
-        .log();
-finiteFlux.subscribe(new BaseSubscriber<Integer>() {
-    @Override
-    protected void hookOnNext(Integer value) {
-        request(1);
-        System.out.println("value : " + value);
-        if (value == 4) {
-            cancel();
-        }
+        StepVerifier.create(integerFlux)
+                .expectSubscription()
+                .expectNext(1, 2 ,3, 4)
+                .verifyComplete();
     }
-});
 ```
 
-BaseSubscriber를 구현하여, hookOnNext메소드를 구현하고 여기에 개수를 지정해서 날려주는 방법이 있다.
+그 다음 @Autowired 어노테이션을 통해 WebTestClient 객체 의존성 주입을 한다. 그리고 @Test 어노테이션을 통해 테스트 하고자 하는 메소드임을 표시하고, 그안에서 WebTestClient를 이용하여 실제로 uri를 실행하는 코드를 작성한다. 그리고 responseBody를 받아 기대에 맞는 body가 들어왔는지 검증한다.
 
-
-### HOT/COLD publisher
-스트림에 hot과 cold publihser가 있다고 한다. 
-```
-Flux<String> stringFlux = Flux.just("A", "B", "C", "D", "E", "F")
-        .delayElements(Duration.ofSeconds(1));
-
-stringFlux.subscribe(s -> System.out.println("subscriber 1 : " + s));  //A부터 시작
-Thread.sleep(2000);
-
-stringFlux.subscribe(s -> System.out.println("subscriber 2 : " + s));  //A부터 시작
-Thread.sleep(4000);
-```
-
-같은 flux를 두 번 subscriber를 해도 위와 같이 구현했을 경우는, 새로운 publish가 발생하여 두 경우 다 A부터 시작하는 스트림을 받게 된다.
+* 주의사항 : test 클래스는 Springboot의 Main 클래스가 담긴 패키지 하위에 존재해야 실행된다. 위치가 잘못되었을 경우 에러를 발생시킴
 
 ```
-Flux<String> stringFlux = Flux.just("A", "B", "C", "D", "E", "F")
-        .delayElements(Duration.ofSeconds(1));
+    @Test
+    public void fluxStream() {
+        Flux<Long> longStreamFlux = webTestClient.get().uri("/flux/stream")
+                .accept(MediaType.APPLICATION_STREAM_JSON)
+                .exchange()
+                .expectStatus().isOk()
+                .returnResult(Long.class)
+                .getResponseBody();
 
-ConnectableFlux<String> connectableFlux = stringFlux.publish();
-connectableFlux.connect();
+        StepVerifier.create(longStreamFlux)
+                .expectNext(0L, 1L, 2L)
+                .thenCancel()
+                .verify();
+    }
+```
+위에서 구현한 stream을 반환하는 메소드 테스트를 하고 싶을 경우, Mediatype을 바꿔주고 테스트 하면 된다.
 
-stringFlux.subscribe(s -> System.out.println("subscriber 1 : " + s));  //A부터 시작
-Thread.sleep(2000);
 
-connectableFlux.subscribe(s -> System.out.println("subscriber 2 : " + s));  //A부터 시작
-Thread.sleep(4000);
+### RouterFunction을 사용할 경우
+Webflux에선 RouterFunction을 이용하여 컨트롤러 매핑을 이용하지 않고, 직접 라우팅을 할 수 있다. 
+
+```
+@Component
+public class SampleHandlerFunction {
+    public Mono<ServerResponse> flux(ServerRequest serverRequest) {
+        return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(
+                        Flux.just(1,2,3,4)
+                        .log(), Integer.class
+                );
+    }
+
+    public Mono<ServerResponse> mono(ServerRequest serverRequest) {
+        return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(
+                        Mono.just(1)
+                                .log(), Integer.class
+                );
+    }
+}
+```
+위와 같이 커스텀 클래스를 만들어서 컴포넌트로 등록하고, ServerRequest를 매개변수로 하여 request를 처리하는 메소드를 각각 구현한다.
+
+```
+@Configuration
+public class SampleRouterFunctionConfig {
+    @Bean
+    public RouterFunction<ServerResponse> route(SampleHandlerFunction sampleHandlerFunction) {
+        return RouterFunctions
+                .route(GET("/functional/flux").and(accept(MediaType.APPLICATION_JSON)), sampleHandlerFunction::flux)
+                .andRoute(GET("/functional/mono").and(accept(MediaType.APPLICATION_JSON)), sampleHandlerFunction::mono);
+    }
+}
+```
+그 다음 위와 같이 Config파일을 생성하여 @Configuration 어노테이션을 통해 설정으로 등록하고, RouterFunction 객체를 반환하는 메소드를 빈으로 등록하여 RouterFunction에 각각 url의 라우트 정보를 등록하여 메소드로 매핑을 해주면, 해당 url이 들어왔을때 매핑된 메소드를 실행되게해준다.
+
+### RouterFunction 테스트
+RouterFunction을 이용하여 구현한 메소드를 테스트 하고 싶을 경우, 컨트롤러 테스트와는 조금 구현 방식이 다르다.
+
+```
+@RunWith(SpringRunner.class)
+@SpringBootTest
+@AutoConfigureWebTestClient
+public class SampleHandlerFunctionTest {
+}
+```
+우선 위와 같이 클래스를 작성하는데, 컨트롤러 테스트와는 다르게 @WebFluxTest를 사용하지 않은 이유는 해당 어노테이션이 컨트롤러 기반으로 테스트하는 어노테이션으로 WebTestClient에 의존성을 주입해주는데, 이 경우는 컨트롤러가 없기 때문에 의존성 주입에 실패를 하게된다. 대신 @AutoConfigureWebTestClient 어노테이션을 사용하여, @Bean으로 등록한 RouterFunction에 대한 의존성 처리를 해서 WebTestClient를 주입해준다.
+
+
+```
+    @Autowired
+    WebTestClient webTestClient;
+
+    @Test
+    public void flux_approach1() {
+        Flux<Integer> integerFlux = webTestClient.get().uri("/functional/flux")
+                .accept(MediaType.APPLICATION_JSON_UTF8)
+                .exchange()
+                .expectStatus().isOk()
+                .returnResult(Integer.class)
+                .getResponseBody();
+
+        StepVerifier.create(integerFlux)
+                .expectSubscription()
+                .expectNext(1, 2 ,3, 4)
+                .verifyComplete();
+    }
 ```
 
-반면 위와 같이 ConnectableFlux를 이용하여 구현했을 경우는, 현재 publish중인 데이터 스트림을 동시에 이용하여 현재 진행중인 데이터를 동시에 받게 된다.
-
-![screensh](../assets/img/2021-04-01-Spring---Webflux(3)/hotpublisher.PNG)
-
-hot publisher의 구조는 위의 그림과 같다.
+나머지 구현 방식은 컨트롤러 테스트와 같다.
 
 참고
 - build-reactive-restful-apis-using-spring-boot-webflux 강좌
-- https://www.slideshare.net/Trayan_Iliev/spring-5-webflux-advances-in-java-2018
