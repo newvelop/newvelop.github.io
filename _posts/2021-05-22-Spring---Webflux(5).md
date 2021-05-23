@@ -125,6 +125,39 @@ public class ItemConstants {
 
 이렇게 하면 CRUD 중 R작업을 하는 Controller가 완성이 된다.
 
+```
+    @PostMapping(ItemConstants.ITEM_END_POINT_V1)
+    @ResponseStatus(HttpStatus.CREATED)
+    public Mono<Item> createItem(@RequestBody Item item) {
+        return itemReactiveRepository.save(item);
+    }
+```
+위와 같은 코드를 추가하여 Item을 생성하는 메소드를 추가한다.
+
+```
+    @DeleteMapping(ItemConstants.ITEM_END_POINT_V1 + "/{id}")
+    public Mono<Void> deleteItem(@PathVariable String id) {
+        return itemReactiveRepository.deleteById(id);
+    }
+```
+id를 받아 delete 하는 메소드 또한 추가한다.
+
+```
+    @PutMapping(ItemConstants.ITEM_END_POINT_V1 + "/{id}")
+    public Mono<ResponseEntity<Item>> updateItem(@PathVariable String id, @RequestBody Item item) {
+        return itemReactiveRepository.findById(id)
+                .flatMap(currentItem -> {
+                    currentItem.setPrice(item.getPrice());
+                    currentItem.setDescription(item.getDescription());
+                    return itemReactiveRepository.save(currentItem);
+                })
+                .map(updatedItem -> new ResponseEntity<>(updatedItem, HttpStatus.OK))
+                .defaultIfEmpty(new ResponseEntity<>(HttpStatus.NOT_FOUND));
+    }
+```
+id와 request body를 받아 update 하는 메소드 또한 추가한다. id가 잘못들어왔을 경우 notfound status 또한 반환한다.
+
+
 ### Test 코드
 해당 컨트롤러가 잘 수행이 되는지 테스트 코드를 작성한다.
 
@@ -240,6 +273,69 @@ response의 BODY를 직접 받아서 테스트하는 메소드도 추가한다.
     }
 ```
 없는 id를 조회하여 없을 경우 notfound를 잘 반환하는지 테스트하는 메소드 또한 추가한다.
+
+```
+@Test
+    public void createItem() {
+        Item item = new Item(null, "Iphone x", 999.99);
+        webTestClient.post().uri(ItemConstants.ITEM_END_POINT_V1)
+            .contentType(MediaType.APPLICATION_JSON_UTF8)
+        .body(Mono.just(item), Item.class)
+        .exchange()
+        .expectStatus().isCreated()
+        .expectBody()
+        .jsonPath("$.id").isNotEmpty()
+        .jsonPath("$.description").isEqualTo("Iphone x");
+    }
+```
+위의 메소드를 추가하여, 지정한 데이터를 가진 item을 추가하는지 테스트 한다.
+
+```
+    @Test
+    public void deleteItem() {
+        webTestClient.delete().uri(ItemConstants.ITEM_END_POINT_V1.concat("/{id}"), "1")
+                .accept(MediaType.APPLICATION_JSON_UTF8)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(Void.class);
+    }
+```
+지정한 id를 삭제하는 메소드 또한 테스트 해본다.
+
+```
+@Test
+    public void updateItem() {
+        String desc = "UPDATE TV";
+        double price = 150.0;
+        Item item = new Item(null, desc, price);
+        webTestClient.put().uri(ItemConstants.ITEM_END_POINT_V1.concat("/{id}"), "1")
+                .contentType(MediaType.APPLICATION_JSON_UTF8)
+                .accept(MediaType.APPLICATION_JSON_UTF8)
+                .body(Mono.just(item), Item.class)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.price").isEqualTo(price)
+                .jsonPath("$.description").isEqualTo(desc);
+    }
+
+    @Test
+    public void updateItem_invalidId() {
+        String desc = "UPDATE TV";
+        double price = 150.0;
+        String id = "notfound";
+        Item item = new Item(null, desc, price);
+        webTestClient.put().uri(ItemConstants.ITEM_END_POINT_V1.concat("/{id}"), id)
+                .contentType(MediaType.APPLICATION_JSON_UTF8)
+                .accept(MediaType.APPLICATION_JSON_UTF8)
+                .body(Mono.just(item), Item.class)
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+```
+위와 같이 update를 하거나, 없는 id를 지정하여 업데이트 시도하는 테스트 메소드를 추가한다.
+
+이렇게 CRUD작업을 하는 Controller 구현을 완료해본다.
 
 참고
 - build-reactive-restful-apis-using-spring-boot-webflux 강좌
