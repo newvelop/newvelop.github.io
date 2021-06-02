@@ -47,9 +47,46 @@ paginate: false
 - String[] produces : response의 body 타입이 여기에 해당될것이며, accept 할경우 처리할 것이다 라고 정의한 부분이다.
   - produces = MediaType.TEXT_PLAIN_VALUE : accept가 TEXT_PLAIN_VALUE일 경우 처리를 한다고 정의하는 부분이다.
 
+### Transaction
+사전적인 정의로는 데이터베이스의 상태를 변화시키기 위해 수행하는 작업의 단위이다. 이 작업의 단위인 트랜잭션은 단순히 sql 한문장이 아니라 여러 문장을 담을 수 있다. 트랜잭션의 성질은 아래와 같이 4가지가 있다.
+
+- 원자성(Atomicity)
+  - 한 트랜잭션내에서 실행한 작업들은 하나로 간주하여, 전체 성공이면 성공, 하나라도 실패하면 실패로 처리
+- 일관성(Consistency)
+  - 트랜잭션은 일관성 있는 데이터베이스를 유지해야함
+- 격리성(Isolation)
+  - 다른 트랜잭션들이 서로 영향을 미치지 않도록 격리
+- 지속성(Durability)
+  - 트랜잭션이 끝나면 결과가 저장돼야함
+
+이 트랜잭션이란 개념아래에서 발생할 수 있는 현상과 이를 Spring 내부에선 어떻게 해결하는지, 그리고 Spring 에서 설정할 수 있는 것들은 무엇이 있는지 확인해본다
+
+#### 격리 수준에 따른 발생 가능 문제
+- Dirty Read
+  - 트랜잭션 A와 B가 동시에 일어나며, A가 값을 변경하고 commit 하기 전에, B가 접근했을 때 이 값에 접근해서 조회할 수 있는 문제이다.
+  - A가 commit 하기전 값을 B가 접근해서 사용했는데, A가 롤백되면 값이 이전값으로 변경되기 때문에 데이터 불일치가 발생한다.
+  - ![screensh](../assets/img/2021-04-20-Spring---Request-and-Transaction/dirty-read.png)
+- Non Repeatable Read
+  - 트랜잭션 A와 B가 동시에 일어나며 
+  - ![screensh](../assets/img/2021-04-20-Spring---Request-and-Transaction/non-repeatable-read.png)
+- Phantom Read
+  - ![screensh](../assets/img/2021-04-20-Spring---Request-and-Transaction/phantom-read.png)
+
+
+#### POSTGRESQL의 TRANSACTION 확인
+```
+  SELECT * FROM pg_locks pl LEFT JOIN pg_stat_activity psa ON pl.pid = psa.pid;
+```
+위의 쿼리를 사용하면 POSTGRESQL에서 현재 진행되는 TRANSACTION의 상태, 락타입, 락의 대상, 트랜잭션에서 수행하는 쿼리들을 확인할 수 있다.
+
+#### Spring Boot + JPA 에서의 TRANSACTION
 
 
 참고
 - https://mangkyu.tistory.com/49
 - https://joont92.github.io/spring/@RequestMapping/
 - https://2ham-s.tistory.com/292
+- https://www.postgresql.org/docs/8.4/view-pg-locks.html
+- https://goddaehee.tistory.com/167
+- https://stackoverflow.com/questions/11043712/what-is-the-difference-between-non-repeatable-read-and-phantom-read
+- https://vladmihalcea.com/dirty-read/
