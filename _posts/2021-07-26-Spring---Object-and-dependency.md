@@ -10,13 +10,15 @@ category:
 tags:
 - Spring
 - Toby의 스프링
+- SOLID
+- 응집도/결합도
 author: newvelop
 paginate: false
 ---
 토비의 스프링을 읽고 이해한 내용을 바탕으로 요약한다.
 
 ### 오브젝트와 의존관계
-#### DB 커넥션 기능 구현을 토대로 하는 스프링의 구조 이해
+#### DB 커넥션 기능 구현
 
 DB를 연결하고 쿼리를 날려서 데이터를 가져오는 기능을 구현하면 이 모든 기능을 한 메소드에 넣고, 설정 값을 넣어서 특정 타입의 DB에 연결하는 코드를 구현 할 수 있다. 하지만 이렇게 구현을 하게 된다면 DB를 다른 제품을 사용한다거나 설정값이 달라지거나 했을 경우 영향을 받는 부분이 상당히 많아지기 때문에 유지보수 측면으로 봤을때 성능이 나쁜 코드가 된다. 이를 기능별로 분리해서 설계하는 방법을 살펴본다.
 
@@ -53,345 +55,55 @@ DB를 연결하고 쿼리를 날려서 데이터를 가져오는 기능을 구�
 * 팩토리 메소드 패턴 : 팩토리 메서드 패턴(Factory method pattern)은 객체지향 디자인 패턴이다. Factory method는 부모(상위) 클래스에 알려지지 않은 구체 클래스를 생성하는 패턴이며. 자식(하위) 클래스가 어떤 객체를 생성할지를 결정하도록 하는 패턴이기도 하다. 부모(상위) 클래스 코드에 구체 클래스 이름을 감추기 위한 방법으로도 사용한다.
 ![screensh](../assets/img/2021-07-26-Spring---Object-and-dependency/factory-method-pattern.png)
 
-하지만 이렇게 분리를 한다고 하더라도, UserDao에 
+하지만 이렇게 분리를 한다고 하더라도, UserDao에서 Connection을 생성한다는 사실은 변하지 않는다. NUserDao 등에서 Connection 생성을 하기 때문에 하위 클래스에서 중복 로직이 있을 경우 중복코드를 작성해야 하며, abstract클래스로 생성하지 않고 body를 갖는 메소드로 기본 메소드를 구현한다 하더라도 java는 단일 상속만을 지원하기 때문에 여러가지 제약사항이 발생한다. 따라서 이를 해결하기 위해 연결 부분을 아예 분리한다.
+
+![screensh](../assets/img/2021-07-26-Spring---Object-and-dependency/connection-with-interface.png)
+
+UserDao안에 ConnectionMaker라는 클래스의 객체를 멤버로 넣어서 커넥션 생성을 해당 객체에 맡기며, 이 ConnectionMaker는 interface로써 필요에 따라 상속하는 Subclass를 생성하여 필드의 멤버 객체로 생성한다. 다시한번 팩토리 메소드 패턴을 사용하는 것이다. 하지만 현 구조에서는 UserDao가 ConnectionMaker 객체를 생성해야 하는 문제가 있다. 이 관계설정 책임을 분리하기 위해 외부에서 ConnectionMaker의 서브클래스 객체를 생성해서 멤버로 주입해주는 외부 클래스를 작성하는 방법으로 관계설정 책임을 분리한다.
+
+![screensh](../assets/img/2021-07-26-Spring---Object-and-dependency/connection-injection.png)
+
+* 객체지향 설계의 원칙(SOLID 원칙)
+
+- 단일 책임의 원칙(Single Responsibility Principle) : 모든 클래스는 각각 하나의 책임만을 가져야 한다는 원칙이다.
+
+- 개방 폐쇄의 원칙(Open-Closed Principle) : 클래스나 모듈의 확장에는 열려있어야 하고 변경에는 닫혀있어야한다.UserDao를 예로 들자면 DB 커넥션 부분은 인터페이스를 사용하여 열어 놓았고, add나 get 같은 본인이 수행하는 기능의 변경에는 닫혀있다. 이를 개방 폐쇄 원칙이라고 한다.
+
+- 리스코프 치환 원칙(Liskov Substitution Principle) : 자식 클래스는 언제나 자신의 부모 클래스를 대체할 수 있다는 원칙이다. 즉 부모클래스가 들어갈 자리에 자식 클래스를 넣어도 동작에 문제가 없다는 것이다.
+
+- 인터페이스 분리 원칙(Interface Segregation Principle) : 자신이 사용하지 않는 인터페이스는 구현하지 말아야 한다는 원칙.하나의 일반적인 인터페이스보다는 여러개의 구체적인 인터페이스가 낫다는 원칙.
+
+- 의존 역전 원칙(Dependency Inversion Principle) : 변화하기 쉬운것, 또는 자주 변화하는 것보단 변화하기 어려운 것에 의존하는 원칙. 구현된 클래스보단 인터페이스나 추상 클래스와 관계를 맺으라는 원리
+
+* 응집도와 결합도
+- 응집도 : 모듈에 포함된 내부 요소들이 하나의 책임/목적을 위해 연결되어있는 정도. 높을수록 좋음. UserDao를 예로 들자면, Connection을 분리하지 않았을 경우, 사용자의 조회와 추가 기능에 변경이 생겼을 경우 수정해야하는 것 뿐만 아니라 DB의 커넥션관련 기능이 변경되어야 할 경우에도 UserDao가 변경되어야 한다. 반면에 수정하고 나선 사용자의 조회와 추가 기능의 변경이 생겼을 때만 수정하면 되기 때문에 높은 응집도를 가진 코드가 되었다.
+
+- 결합도 : 다른 오브젝트/모듈과의 결합도를 의미하며 이는 낮을수록 좋음. 하나의 오브젝트가 변경이 일어날 때에 관계를 맺고 있는 다른 오브젝트에게 변화를 요구하는 정도라고 책에선 설명한다. 만약 Connection 관련 기능이 변경되어서 새로운 클래스를 생성해서 UserDao에서 사용해야 한다 하더라도, ConnectionMaker 인터페이스를 사용했기 때문에 코드 상에서 변경은 없으며, 추가적으로 UserDaoTest라는 클래스에서 ConnectionMaker의 서브클래스 객체를 생성해서 UserDao에 주입을 해주기 때문에 UserDao에 영향을 적게 주기 때문에 낮은 결합도를 지녔다고 볼 수 있다.
+
+* 전략 패턴 : 자신의 기능에 따라서 필요한 알고리즘을 인터페이스를 통해 외부로 분리시키고, 필요에 따라 클래스로 구현해서 사용하는 패턴으로 UserDao의 최종형태가 이 패턴이라고 할 수 있다.
+
+#### 애플리케이션 컨텍스트
+UserDao의 Connection을 생성하여 필드에 세팅한후 UserDao 클래스의 객체를 생성하는 팩토리를 생성하면 다음과 같다.
+
+![screensh](../assets/img/2021-07-26-Spring---Object-and-dependency/factory.png)
+
+일반적으로 오브젝트를 생성할 때 본인이 사용할 클래스를 선택해서 객체를 생성할 수 있는데 이 개념을 뒤집어서, 오브젝트가 자신이 사용할 오브젝트를 생성하지 않고 외부에서 주입해 주는 것을 제어 역전이라고 한다. 위와 같이 팩토리를 이용하여 UserDao에 ConnectionMaker를 주입해서 생성하면 이미 제어의 역전이 일어났다고 불 수 있다.
+
+이제 스프링으로 넘어가서 스프링의 제어역전 현상을 알아보면, 스프링에서는 스프링이 제어권을 가지고 직접 만들어 관계를 부여하는 오브젝트를 빈이라고 한다. 이 빈의 생성과 관계설정과 같은 제어를 담당하는 것이 스프링에서는 빈 팩토리라고 부른다. 이를 확장한 개념이 애플리케이션 컨텍스트이다.
+
+이전에 설계했던 UserDao를 빈으로 등록하고 싶으면 @Configuration이란 어노테이션이 달린 DaoFactory 클래스를 정의하고 UserDao 타입의 객체를 반환하는 메소드를 하나 선언한뒤, @Bean 어노테이션을 그 위에 달아주면 애플리케이션 컨텍스트에 빈으로 등록해서 사용할 수 있다.
+
+![screensh](../assets/img/2021-07-26-Spring---Object-and-dependency/applicationcontext-bean.png)
+
+이렇게 등록할 경우 빈으로 어떻게 사용할 수 있냐면, 사용자가 userDao라는 빈을 사용하고 싶다고 할 경우 애플리케이션 컨텍스트에 이름을 기반으로 한 빈을 요청하고, 이 빈을 애플리케이션 컨텍스트에선 @Configuration 기반으로 찾아서 등록되어있는 빈을 반환하는 구조이다.
+
+이런 식으로 사용할 경우, 몇가지 장점이 있다고 한다.
+1. 클라이언트는 구체적인 팩토리 클래스를 알 필요가 없다 - DaoFactory같은 클래스를 여러개 애플리케이션 컨텍스트에 설정으로 등록해서 사용한다고 해도, 클라이언트는 이를 알필요 없이 빈을 가져올 수 있다.
+2. 애플리케이션 컨텍스트는 종합 IoC 서비스를 제공해준다 - 애플리케이션 컨텍스트는 관계설정만하는 것이 아니라, 오브젝트가 만들어지는 방식, 시점과 전략을 다르게 가져갈 수 있고 자동생성, 후처리 등의 다양한 기능을 제공하기 때문에 여러모로 편리하다고 한다.
+3. 애플리케이션 컨텍스트는 빈을 검색하는 다양한 방법을 제공한다 - 빈의 이름을 이용해서 찾을 수 도 있지만 타입으로도 찾을 수 있고, 어노테이션이 달린 빈을 찾을 수 도 있다.
 
 
 참고
 - 토비의 스프링
 - https://yaboong.github.io/design-pattern/2018/09/27/template-method-pattern/
 - https://ko.wikipedia.org/wiki/%ED%8C%A9%ED%86%A0%EB%A6%AC_%EB%A9%94%EC%84%9C%EB%93%9C_%ED%8C%A8%ED%84%B4
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-```
-dependencies {
-	implementation('org.springframework.boot:spring-boot-starter-data-mongodb-reactive')
-	implementation('org.springframework.boot:spring-boot-starter-webflux')
-	compileOnly('org.projectlombok:lombok')
-	testImplementation('org.springframework.boot:spring-boot-starter-test')
-	testImplementation('de.flapdoodle.embed:de.flapdoodle.embed.mongo')
-	testImplementation('io.projectreactor:reactor-test')
-}
-```
-위와 같은 식으로 의존성을 연결하여 구현 및 테스트를 할 수 있게 설정을 한다.
-
-그리고 연결을 위한 DB의 URL 및 포트를 설정해야하는데 이는 applciation.yml 혹은 application.properties에 설정을 한다. 본인은 이번에 yml을 사용하도록 한다.
-
-```
-    spring:
-    profiles:
-        active: nonprod
-    ---
-    spring:
-    profiles: dev
-    data.mongodb:
-        host: localhost
-        port: 27017
-        database: local
-    ---
-    spring:
-    profiles: nonprod
-    data.mongodb:
-        host: localhost
-        port: 27017
-        database: local
-    ---
-```
-이런 식으로 yml에 profile별 연결 설정을 ---으로 구분을 해주고 각 profile별 연결설정을 해주면 연결은 자동으로 한다.
-
-#### DB 연결을 위한 클래스 생성
-DB와 주고받을 데이터를 담을 클래스를 생성한다.
-
-```
-@Document
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
-public class Item {
-
-    @Id
-    private String id;
-    private String description;
-    private Double price;
-}
-```
-2,3,4 번재의 어노테이션의 lombok의 어노테이션으로, 해당 라이브러리를 사용하지 않을 경우, getter setter 및 생성자를 따로 정의 해주면 된다.
-
-
-```
-public interface ItemReactiveRepository extends ReactiveMongoRepository<Item,String> {
-
-}
-```
-그리고 위와 같이 데이터를 주고받는 작업을 수행할 repository를 생성한다.
-
-#### Controller 생성
-API를 구현하기 위한 클래스를 생성한다.
-```
-@RestController
-@Slf4j
-public class ItemController {
-}
-```
-
-그리고 데이터의 CRUD를 수행할 Repository의 의존성을 주입한다. 원래는 service 클래스를 따로 만들어 비즈니스로직을 서비스에서 수행을 하는 것이 좋은 코드이나 이번엔 실행하는 것이 목적이기 때문에 그냥 구현을 하도록 한다.
-
-```
-private final ItemReactiveRepository itemReactiveRepository;
-
-    public ItemController(ItemReactiveRepository itemReactiveRepository) {
-        this.itemReactiveRepository = itemReactiveRepository;
-    }
-```
-
-그리고 아래와 같이 endpoint로 사용할 string 들을 상수들로 해서 변경에 대응할 수 있도록 선언한다.
-```
-public class ItemConstants {
-    public static final String ITEM_END_POINT_V1 = "/v1/items";
-}
-```
-
-```
-    @GetMapping(ItemConstants.ITEM_END_POINT_V1)
-    public Flux<Item> getAllItems() {
-        return itemReactiveRepository.findAll();
-    }
-
-    @GetMapping(ItemConstants.ITEM_END_POINT_V1 + "/{id}")
-    public Mono<ResponseEntity<Item>> getOneItem(@PathVariable String id) {
-        return itemReactiveRepository.findById(id)
-                .map(item -> new ResponseEntity<>(item, HttpStatus.OK))
-                .defaultIfEmpty(new ResponseEntity<>(HttpStatus.NOT_FOUND));
-    }
-```
-
-그리고 전체 조회와 id를 통한 조회를 하는 코드를 생성한다.
-
-이렇게 하면 CRUD 중 R작업을 하는 Controller가 완성이 된다.
-
-```
-    @PostMapping(ItemConstants.ITEM_END_POINT_V1)
-    @ResponseStatus(HttpStatus.CREATED)
-    public Mono<Item> createItem(@RequestBody Item item) {
-        return itemReactiveRepository.save(item);
-    }
-```
-위와 같은 코드를 추가하여 Item을 생성하는 메소드를 추가한다.
-
-```
-    @DeleteMapping(ItemConstants.ITEM_END_POINT_V1 + "/{id}")
-    public Mono<Void> deleteItem(@PathVariable String id) {
-        return itemReactiveRepository.deleteById(id);
-    }
-```
-id를 받아 delete 하는 메소드 또한 추가한다.
-
-```
-    @PutMapping(ItemConstants.ITEM_END_POINT_V1 + "/{id}")
-    public Mono<ResponseEntity<Item>> updateItem(@PathVariable String id, @RequestBody Item item) {
-        return itemReactiveRepository.findById(id)
-                .flatMap(currentItem -> {
-                    currentItem.setPrice(item.getPrice());
-                    currentItem.setDescription(item.getDescription());
-                    return itemReactiveRepository.save(currentItem);
-                })
-                .map(updatedItem -> new ResponseEntity<>(updatedItem, HttpStatus.OK))
-                .defaultIfEmpty(new ResponseEntity<>(HttpStatus.NOT_FOUND));
-    }
-```
-id와 request body를 받아 update 하는 메소드 또한 추가한다. id가 잘못들어왔을 경우 notfound status 또한 반환한다.
-
-
-### Test 코드
-해당 컨트롤러가 잘 수행이 되는지 테스트 코드를 작성한다.
-
-```
-@SpringBootTest
-@RunWith(SpringRunner.class)
-@DirtiesContext
-@AutoConfigureWebTestClient
-@ActiveProfiles("test")
-public class ItemControllerTest {
-}
-```
-위와 같이 어노테이션을 달고있는 클래스를 선언한다.
-
-```
-    @Autowired
-    WebTestClient webTestClient;
-
-    @Autowired
-    ItemReactiveRepository itemReactiveRepository;
-```
-
-그리고 의존성 주입을 해준다. test를 수행할때 constructor injection을 하여 의존성 주입을 할 경우, 정상동작이 안되기 때문에 일단 어노테이션으로 주입을 해준다.
-
-```
-    public List<Item> data() {
-        return Arrays.asList(new Item(null, "SAMSUNG TV", 400.0), new Item(null, "LG TV", 300.0), new Item(null, "APPLE TV", 200.0), new Item("1", "TV", 100.0));
-    }
-```
-조회를 테스트하기위한 더미데이터를 생성하는 메소드를 작성한다.
-
-```
-    @Before
-    public void setUp() {
-        itemReactiveRepository.deleteAll()
-                .thenMany(Flux.fromIterable(data()))
-                .flatMap(itemReactiveRepository::save)
-                .doOnNext(item -> {
-                    System.out.println(item);
-                })
-                .blockLast();
-    }
-```
-그리고 모든 테스트 메소드 수행전에 데이터 초기화하는 메소드를 정의하고 @Before 메소드를 통해 수행하게 끔한다.
-
-```
-    @Test
-    public void getAllItems() {
-        webTestClient.get().uri(ItemConstants.ITEM_END_POINT_V1)
-                .exchange()
-                .expectStatus().isOk()
-                .expectHeader().contentType(MediaType.APPLICATION_JSON_UTF8)
-                .expectBodyList(Item.class)
-                .hasSize(data().size());
-    }
-```
-우선 모든 item을 조회하는 메소드를 테스트하는 메소드를 작성한다. 정상 동작일 경우 http status는 ok가 떨어지고 body의 각각의 타입은 item 클래스 일것이며 사이즈 또한 동일 할 것이다.
-
-```
-    @Test
-    public void getAllItems_approach2() {
-        webTestClient.get().uri(ItemConstants.ITEM_END_POINT_V1)
-                .exchange()
-                .expectStatus().isOk()
-                .expectHeader().contentType(MediaType.APPLICATION_JSON_UTF8)
-                .expectBodyList(Item.class)
-                .hasSize(data().size())
-        .consumeWith((response) -> {
-            List<Item> items = response.getResponseBody();
-            items.forEach((item) -> {
-                assertTrue(item.getId() != null);
-            });
-        });
-    }
-```
-또한 데이터가 올바르게 저장되었을 경우, mongodb 자체에서 id를 발급해주기 때문에 response stream을 consume 해서 각 item들의 id가 null 이 있는지 체크를 해준다.
-
-```
-    @Test
-    public void getAllItems_approach3() {
-        Flux<Item> itemFlux = webTestClient.get().uri(ItemConstants.ITEM_END_POINT_V1)
-                .exchange()
-                .expectStatus().isOk()
-                .expectHeader().contentType(MediaType.APPLICATION_JSON_UTF8)
-                .returnResult(Item.class)
-                .getResponseBody();
-
-        StepVerifier.create(itemFlux)
-                .expectNextCount(data().size())
-                .verifyComplete();
-    }
-```
-response의 BODY를 직접 받아서 테스트하는 메소드도 추가한다.
-
-```
-    @Test
-    public void getOneItem() {
-        webTestClient.get().uri(ItemConstants.ITEM_END_POINT_V1.concat("/{id}"), "1")
-        .exchange()
-        .expectStatus().isOk()
-        .expectBody()
-        .jsonPath("$.price", 100.00);
-    }
-```
-단일 조회를 했을 때 해당 RESPONSE가 올바른 것을 반환했는지 확인하기 위한 메소드도 추가한다. jsonPath 메소드에서 $.속성명 을 정의해서 해당 속성에 올바른 값이 조회가 되는지 확인을 한다.
-
-```
-    @Test
-    public void getOneItem_notfound() {
-        webTestClient.get().uri(ItemConstants.ITEM_END_POINT_V1.concat("/{id}"), "2")
-                .exchange()
-                .expectStatus().isNotFound();
-    }
-```
-없는 id를 조회하여 없을 경우 notfound를 잘 반환하는지 테스트하는 메소드 또한 추가한다.
-
-```
-@Test
-    public void createItem() {
-        Item item = new Item(null, "Iphone x", 999.99);
-        webTestClient.post().uri(ItemConstants.ITEM_END_POINT_V1)
-            .contentType(MediaType.APPLICATION_JSON_UTF8)
-        .body(Mono.just(item), Item.class)
-        .exchange()
-        .expectStatus().isCreated()
-        .expectBody()
-        .jsonPath("$.id").isNotEmpty()
-        .jsonPath("$.description").isEqualTo("Iphone x");
-    }
-```
-위의 메소드를 추가하여, 지정한 데이터를 가진 item을 추가하는지 테스트 한다.
-
-```
-    @Test
-    public void deleteItem() {
-        webTestClient.delete().uri(ItemConstants.ITEM_END_POINT_V1.concat("/{id}"), "1")
-                .accept(MediaType.APPLICATION_JSON_UTF8)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody(Void.class);
-    }
-```
-지정한 id를 삭제하는 메소드 또한 테스트 해본다.
-
-```
-@Test
-    public void updateItem() {
-        String desc = "UPDATE TV";
-        double price = 150.0;
-        Item item = new Item(null, desc, price);
-        webTestClient.put().uri(ItemConstants.ITEM_END_POINT_V1.concat("/{id}"), "1")
-                .contentType(MediaType.APPLICATION_JSON_UTF8)
-                .accept(MediaType.APPLICATION_JSON_UTF8)
-                .body(Mono.just(item), Item.class)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$.price").isEqualTo(price)
-                .jsonPath("$.description").isEqualTo(desc);
-    }
-
-    @Test
-    public void updateItem_invalidId() {
-        String desc = "UPDATE TV";
-        double price = 150.0;
-        String id = "notfound";
-        Item item = new Item(null, desc, price);
-        webTestClient.put().uri(ItemConstants.ITEM_END_POINT_V1.concat("/{id}"), id)
-                .contentType(MediaType.APPLICATION_JSON_UTF8)
-                .accept(MediaType.APPLICATION_JSON_UTF8)
-                .body(Mono.just(item), Item.class)
-                .exchange()
-                .expectStatus().isNotFound();
-    }
-```
-위와 같이 update를 하거나, 없는 id를 지정하여 업데이트 시도하는 테스트 메소드를 추가한다.
-
-이렇게 CRUD작업을 하는 Controller 구현을 완료해본다.
-
-참고
-- build-reactive-restful-apis-using-spring-boot-webflux 강좌
