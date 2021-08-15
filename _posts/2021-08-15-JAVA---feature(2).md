@@ -197,30 +197,12 @@ public static void main(String[] args) {
 
 Call by Reference 같은 경우는 Call by Value와는 다르게 참조하는 주소를 복사해서 던져서 호출했던 곳에서도 영향을 주는 방법이다. Java의 클래스 객체를 넘길경우가 이해 해당된다. 예를 들어 String a = "abc"; 라는 문장을 선언하면 String 타입의 참조 변수 a가 스택에 저장되고, "abc"는 힙에 저장된다. a는 "abc"의 주소를 가지고 있기 때문에 이를 메소드에 전달할 경우 주소를 전달해서 "abc"의 영역에 직접 영향을 미친다. 단 Integer 같은 primitive 타입의 wrapper 클래스는 immutable 속성을 지녀서, 넘긴다 그래도 pass by value로 넘겨진다고 하니 원하는 대로 동작하지 않는다.
 
-여기서 call by address와 call by reference의 차이가 어떤건지를 좀 알아보면, 먼저 call by address는 c++에서 나오는 개념이다.
+여기서 call by address와 call by reference의 차이가 어떤건지를 좀 알아보면, call by address 같은 경우는 파라미터로 넘기는 실제 파라미터와, 메소드에서 사용하는 파라미터를 위해 각각 메모리 할당을 한다. 반면에 call by reference의 경우는 실제 파라미터와 메소드에서 사용하는 파라미터가 메모리를 공유한다는 차이점이 있다.
 
-```
-void testFunc(int* pPtr) {
-    pPtr = NULL;
-}
-
-int main(void) {
-    int num = 0;
-    int* ptr = &num;
-
-    cout << ptr << endl;
-    testFunc(ptr);
-    cout << ptr << endl;
-
-    return 0;
-}
-```
-이런 식의 C++ 코드가 있다고 하면, 프린트 되는 결과는 (EX)0x65fe44) 두번 다 같다. testFunc 에서 NULL 을 넣어줬는데도 불구하고 주소가 찍히는 이유가 잇는데 매개변수로 넘겨주는 pPtr과 ptr은 사실 다르기 때문이다. ptr의 경우는 num의 주소값을 가리키는 변수이다. 이 변수를 testFunc에 넘기면 pPtr이라는 변수가 새로운 주소에 할당되면서 이 주소에 0x65fe44라는 값이 저장되는 것이다. 즉 NULL을 할당해주면, 새로운 주소에 NULL이 저장되는 것이지 0x65fe44주소에 저장된 값이 바뀌는 게 아니라는 것이다.
-반면에 JAVA의 경우는 NULL이 그대로 저장이 되어버린다. 이게 Address와 Reference의 차이이다.
 
 참고
 - https://coding-factory.tistory.com/265
 - https://sehun-kim.github.io/sehun/java-lambda-stream/
 - http://kbs0327.github.io/blog/technology/java8-default-interface/
 - https://flyburi.com/605
-- https://namu.wiki/w/%EC%B0%B8%EC%A1%B0%EC%97%90%20%EC%9D%98%ED%95%9C%20%ED%98%B8%EC%B6%9C
+- https://askinglot.com/open-detail/328887
