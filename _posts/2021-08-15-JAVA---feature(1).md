@@ -1,7 +1,7 @@
 ---
 date: 2021-08-15 07:00:39
 layout: post
-title: "JAVA-featrue(1)"
+title: "JAVA-feature(1)"
 subtitle:
 description:
 image:
