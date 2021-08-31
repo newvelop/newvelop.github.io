@@ -115,6 +115,63 @@ public long totalCount(int age) {
 
 age를 기반으로 페이징을 한다면, 우선 조건을 설정하며, setFirstResult에 어디서 부터 가져올지 offset을 넘겨준다. 그리고 maxResult로 최대 개수를 설정해서 조건에 맞는 객체들을 가져온다. 이렇게 해서 offset과 limit을 설정하고, 페이징의 경우는 전체 몇 중에 몇 까지 표시를 해야하기 때문에 전체 개수도 조회하는 쿼리를 작성한다. 이런 식으로 JPA를 이용하여 페이징을 수행한다.
 
+이렇게 전체 조회 쿼리와 목록조회 쿼리를 따로 호출을 해야하는데 Spring Data JPA는 Pageable 파라미터를 사용하는 메소드를 정의하면 한번에 해결된다.
+
+```
+Page<Member> findByAge(int age, Pageable pageable);
+```
+위와 같이 정의를 하고, 파라미터를 넘길때 PageRequest에 offset과 limit을 넣고, Sort 기준들을 필요하면 넣어서 파라미터로 날리면 offset과 limit을 반영한 쿼리를 수행하고, 그와 동시에 전체 카운트를 조회하는 쿼리를 하나 더 날려서 페이징에 필요한 데이터를 불러오는 동작을 수행한다.
+
+```
+public void paging() {
+    memberJpaRepository.save(new Member("member1", 10));
+    memberJpaRepository.save(new Member("member2", 10));
+    memberJpaRepository.save(new Member("member3", 10));
+    memberJpaRepository.save(new Member("member4", 10));
+    memberJpaRepository.save(new Member("member5", 10));
+
+    int age = 10;
+    int offset = 0;
+    int limit = 3;
+
+    List<Member> members = memberJpaRepository.findByPage(age, offset, limit);
+    long count = memberJpaRepository.count();
+
+    assertThat(members.size()).isEqualTo(3);
+    assertThat(count).isEqualTo(5);
+}
+```
+위와 같이 테스트할 경우, 일반 JPA 방식과 동일한 결과물을 가져온다.
+
+Page 타입으로 반환하는 메소드를 선언했을 경우, 전체수 조회쿼리와 페이징 쿼리 두개가 수행되는데 Page를 상속하는 Slice 타입으로 반환할 경우, 전체수 조회쿼리는 날라가지 않고, 페이징 쿼리만 수행되며, limit이 요구했던 것보다 하나 더 증가해서 수행한다.
+
+```
+select member0_.member_id as member_i1_0_, member0_.age as age2_0_, member0_.team_id as team_id4_0_, member0_.user_name as user_nam3_0_ from member member0_ where member0_.age=10 order by member0_.user_name desc limit 4;
+```
+
+위와 같이 수행이 되어서, 조회했던 것의 다음 객체까지 가져올 수 있다.
+
+List로 반환을 받아도 되는데 이러면 전체 수 조회를 하지 않고 지정된 limit의 수만큼 객체 조회를 한다.
+
+다만 여기에서 문제가 있는데 Page로 반환하면 전체수 조회를 하는 쿼리가 수행된다고 했다. 그렇다면 전체 테이블 스캔하는 쿼리가 수행된다는 소린데 이 count 쿼리가 join을 수행한다면 테이블의 join하는 작업까지 많은 부하가 발생한다. 따라서 countQuery를 분리해서 최적화하는 방법 또한 존재한다.
+
+```
+@Query(value = "select m from Member m left join m.team t", countQuery = "select count(m) from Member m")
+Page<Member> findOptimizeByAge(int age, Pageable pageable);
+```
+위와 같이 메소드를 정의하면,
+
+```
+select member0_.member_id as member_i1_0_, member0_.age as age2_0_, member0_.team_id as team_id4_0_, member0_.user_name as user_nam3_0_ from member member0_ left outer join team team1_ on member0_.team_id=team1_.team_id order by member0_.user_name desc limit 3 offset 3;
+```
+위와 같은 페이징 쿼리가 수행되며, count Query 또한 수행이된다. 뿐만 아니라 정의를 한 jpql에는 offset과 limit을 사용하지 않았지만 파라미터로 pageable을 넘기게되면 Spring Data JPA에서 알아서 페이징을 적용한 쿼리를 생성해서 날려준다. 가끔가다가 countQuery가 수행되는 로그가 찍히지 않는 경우가 있는데, 이때는 내부에서 카운트쿼리를 수행할 필요가 없으면 알아서 최적화해서 수행하지 않는다고 한다. 'org.springframework.data.repository.support.PageableExecutionUtils' 이 클래스에서 최적화를 수행한다고 하니 나중에 살펴보면 좋을 듯 하다.
+
+또한 엔티티를 직접 노출시키기 않기위해 매핑하는 작업이 있는데 이 작업을 Page 클래스를 이용하면 쉽게 해결한다.
+
+```
+Page<MemberDto> list = page.map(m -> new MemberDto(m.getId(), m.getUserName(), m.getTeam().getName()));
+```
+이런식으로 map 메소드를 이용하여 dto로 매핑하는 작업을 수행하면 쉽게 반환할 수 있다.
 
 
 ![screensh](../assets/img/2021-08-25-Spring---Spring-Data-JPA-interface/interface.png)
@@ -124,3 +181,4 @@ age를 기반으로 페이징을 한다면, 우선 조건을 설정하며, setFi
 
 참고
 - https://www.inflearn.com/course/%EC%8A%A4%ED%94%84%EB%A7%81-%EB%8D%B0%EC%9D%B4%ED%84%B0-JPA-%EC%8B%A4%EC%A0%84
+- https://www.inflearn.com/questions/32481
