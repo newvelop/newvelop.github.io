@@ -173,6 +173,48 @@ Page<MemberDto> list = page.map(m -> new MemberDto(m.getId(), m.getUserName(), m
 ```
 이런식으로 map 메소드를 이용하여 dto로 매핑하는 작업을 수행하면 쉽게 반환할 수 있다.
 
+#### 벌크 수정
+DB의 값중 조건에 맞는 행들의 값을 한꺼번에 업데이트 해야될 때가 있다. 그럴 경우 그냥 JPA 에선,
+
+```
+public int bulkAgePlus(int age) {
+    return em.createQuery("update Member m set m.age = m.age + 1 where m.age >= :age")
+            .setParameter("age", age)
+            .executeUpdate();
+}
+```
+위와 같이 jpql을 작성하고, executeUpdate를 실행해서 업데이트 문을 실행시켜주면 된다.
+
+```
+@Modifying
+@Query("update Member m set m.age = m.age + 1 where m.age >= :age")
+int bulkAgePlus(@Param("age") int age);
+```
+Spring Data JPA는 이보다 좀더 간단히 할 수 있는데, @Query에 JPQL작성한후, Modifying이라는 어노테이션을 달아서 정의하면, update JPQL이 실행된다. @Modifying을 작성하지 않으면 예외가 발생하는데, 이는 getResultList같은 메소드가 동작하기 때문에 수정이 올바르게 동작하지 않아서 그렇다.
+
+하지만 이렇게 작성만한다고 완벽하게 해결되는 부분이 아니다. bulk 수정 쿼리는 JPA에서 영속성을 거치지 않고 바로 DB에 직접 업데이트를 한다고 한다.
+
+```
+@Test
+public void bulkAgePlus() {
+    memberRepository.save(new Member("member1", 10));
+    memberRepository.save(new Member("member2", 19));
+    memberRepository.save(new Member("member3", 20));
+    memberRepository.save(new Member("member4", 21));
+    memberRepository.save(new Member("member5", 40));
+
+
+    int resultCount = memberRepository.bulkAgePlus(20);
+
+    Member m = memberRepository.findByName("member5");
+
+    assertThat(resultCount).isEqualTo(3);
+}
+```
+위와 같이 코드를 작성했을 경우, findByName을 수행하면, bulkAgePlus 조건에 맞는 40이 +1이 되어서 41이 조회가 될거같지만, 영속성에 있는 member5를 조회해서 40으로 조회가 되는 문제점이 있다.
+
+이를 해결하기 위해선, entityManager 의존성을 주입받아서 clear를 호출하던가, 아니면 Spring Data JPA의 경우, @Modifying(clearAutomatically = true)를 작성하여, 수정후 자동으로 clear하게 해주면 데이터 불일치를 해결할 수 있다.
+
 
 ![screensh](../assets/img/2021-08-25-Spring---Spring-Data-JPA-interface/interface.png)
 
