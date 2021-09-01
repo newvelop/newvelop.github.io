@@ -1,7 +1,7 @@
 ---
-date: 2021-08-25 07:00:39
+date: 2021-08-26 07:00:39
 layout: post
-title: "Spring-Spring Data JPA interface"
+title: "Spring-Spring Data JPA method and options"
 subtitle:
 description:
 image:
@@ -11,6 +11,10 @@ tags:
 - Spring
 - Spring Data JPA
 - 실전! 스프링 데이터 JPA
+- lock
+- hint
+- EntityGraph
+- pagination
 author: newvelop
 paginate: false
 ---
@@ -216,9 +220,57 @@ public void bulkAgePlus() {
 이를 해결하기 위해선, entityManager 의존성을 주입받아서 clear를 호출하던가, 아니면 Spring Data JPA의 경우, @Modifying(clearAutomatically = true)를 작성하여, 수정후 자동으로 clear하게 해주면 데이터 불일치를 해결할 수 있다.
 
 
-![screensh](../assets/img/2021-08-25-Spring---Spring-Data-JPA-interface/interface.png)
+#### Entity Graph
+엔티티에 관계를 맺은 엔티티가 있을때, Lazy로딩 조회를 하게 되면 N+1 쿼리가 발생하게 된다. 예를 들어서 Member가 Team과 ManyToOne 관계를 맺고 있고, Member를 N개 조회했는데, 이때 Team를 각각 조회하게 되면 Lazy로딩으로 엮여 있을때, 맨처음에 Team의 프록시 객체를 Member의 필드에 넣어놨다가, 실제 조회할 때 Lazy 로딩이 일어나서 실객체를 조회하게된다. 이때 N개의 TEAM 조회 쿼리를 수행하기 때문에 전체조회 쿼리 1개 + Team 객체 조회 N개 해서 총 N+1번 조회가 일어나는게 N+1문제이다.
 
+이를 해결하기 위해서 Spring Data JPA에선 여러가지 방법이 있는데 우선 첫번째로는 JPQL을 직접 작성하면서 fetch를 사용하는 것이다.
 
+```
+@Query("select m from Member m left join fetch m.team")
+List<Member> findMemberFetchJoin();
+```
+
+위와 같이 작성을 하면 되는데 왜 join만 하면 안되는지를 살펴보면, join의 경우는 Member와 Team 테이블을 join을 할 결과를 가지고 있는다. 하지만 select m이기 때문에 Member의 필드만 조회하는 sql이 생성되어서 JPQL에 fetch를 넣어, Team의 필드까지 조회하는 sql을 생성하게 하는 것이다. 
+
+위와 같은 방법말고 Entity Graph를 이용하는 방법도 있다.
+
+```
+@EntityGraph(attributePaths = {"team"})
+@Query("select m from Member m")
+List<Member> findMemberEntityGraph();
+```
+
+위와 같이 정의를 하면, Member안에 있는 team이라는 path가 Team 엔티티와 연결되어있기 때문에 이를 조회하는 쿼리를 자동적으로 생성해줘서 결과적으로 fetch를 한 결과와 동일한 수행결과를 가져온다. 이는 findBy? 와 같은 조건을 이용하는 조회 쿼리에도 동작을 한다. 엔티티에 직접 NamedEntityGraph를 정의하여 사용하는 방법도 있다.
+
+```
+@NamedEntityGraph(name = "Member.all", attributeNodes = @NamedAttributeNode("team"))
+```
+이런식으로 위와 같이 name에 해당 그래프의 이름을 정의하고 attributeNodes에 조회할 연관 엔티티를 정의한다.
+```
+@EntityGraph("Member.all")
+List<Member> findNamedEntityByUserName(@Param("userName") String userName);
+```
+그 이후 위와같이 EntityGraph에 Named의 이름을 적어주면 사용할 수 있다.
+
+#### JPA HINT & LOCK
+JPA의 구현체에게 제공하는 힌트를 의미한다. JPA는 자바에서 사용하기 위한 ORM 인터페이스이고 이를 구현하는 구현체는 hibernate등이 있다. 이 구현체에게 직접 힌트를 건내주는 것을 의미한다.
+
+예를 들어서 JPA를 이용하여 조회쿼리를 수행하면, 기본적으로는 스냅샷으로 조회한 객체를 저장한다. 무슨 소리냐면, 조회쿼리가 수행될때 가져온 결과를 다른 한곳에 저장하고, 이를 호출한 곳에 반환을 하는게 기본적인 흐름이다. 거기서 반환한 수정하고 flush를 하면 JPA에선 이 객체와 다른 한곳에 저장한 스냅샷을 비교하는 더티체킹을 수행해서 달라졌을 경우 업데이트 쿼리를 수행하는 것이다.
+
+하지만 조회만 할 것이면 이 스냅샷을 저장하고 비교하는 작업을 수행할 이유가 없기 때문에 이에 대한 최적화를 할 수 있고, 이는 JPA의 구현체에서 옵션으로 제공한다면 사용할 수 있을 것이다. 이때 이 옵션을 사용한다라고 구현체에 전달해주는 것이 JPA HINT이다.
+
+```
+@QueryHints(value =@QueryHint(name = "org.hibernate.readOnly", value = "true"))
+Member findReadOnlyById(Long id);
+```
+이런 식으로 위와 같이 Hint를 설정한 메소드를 정의하면 구현체에 넘겨서 최적화 진행이 완료된다. 이 해당옵션은 사실, 쿼리를 튜닝하는 것에 비해 최적화가 그렇게 많이 수행되는 작업은 아니기 때문에 실제로 성능 테스트를 해보고 효과가 좋으면 그때 도입 하는것이 좋다고 강의에서 언급을 하였다.
+
+또한 JPA에서 LOCK을 이용할 수 있는데, 
+```
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+List<Member> findLockByUserName(String userName);
+```
+이런 식으로 Lock을 사용한다는 어노테이션을 작성하면 쿼리가 lock을 수행하게끔 작성된다.
 
 
 참고
